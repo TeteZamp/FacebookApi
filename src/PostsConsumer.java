@@ -8,7 +8,6 @@ import com.restfb.json.JsonArray;
 import com.restfb.json.JsonObject;
 import com.restfb.types.Page;
 import com.restfb.types.Post;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -19,251 +18,157 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 /**
  *
  * @author Stefania
  */
 public class PostsConsumer {
 
-    private static FacePosts thepost;
-    //static String ARQUIVO = PostsConsumer.class.getResource("../artigos.js").getFile();
+    private static JsonArray myjsonarray;//define um array do tipo Json
+    private static JsonObject myjsonobj; //define obj do tipo Json
 
+    private static FacePosts thepost; //objeto do tipo post com 3 atributos(post_id,message,created_time)
 
-    // 3 - Crie uma classe Java com dois métodos (getPosts e getVolume) que consuma os dados dessa tabela : 
+    //metodo que busca os posts com base no numero de dias desejados de uma determinada pagina
+    //e insere na tabela do banco
+    protected static void fetchFacePosts(int lastXdays, String facebookPg, String accessToken) throws ParseException {
+
+        FacebookClient fbClient = new DefaultFacebookClient(accessToken, Version.LATEST);
+        //instancia um obj do tipo facebook client, verifica o token e define a versao da api
+
+        Page page = fbClient.fetchObject(facebookPg, Page.class);//instancia um obj do tipo facebook Page que 
+        //recebe uma pagina do facebook via metodo fetchObjetc da api
+
+        Calendar cal = Calendar.getInstance(); //instancia um obj do tipo calendario
+        cal.setTime(Calendar.getInstance().getTime());//configura a data de hoje no objeto
+        Date sincedt;//instancia um obj do tipo date
+
+        //System.out.println("Current Date: " + cal.getTime());
+        //System.out.println("Unix Time Date: " + sincedt.getTime() / 1000);
+        cal.add(Calendar.DATE, -lastXdays);//modifica o obj calendario subtraindo X dias
+        sincedt = cal.getTime(); //atribui a data subtraida ao obj do tipo date
+
+        //System.out.println("Old Date: " + cal.getTime());
+        //System.out.println("Unix Time Old Date: " + sincedt.getTime() / 1000);
+        Long sinceunixtime = sincedt.getTime() / 1000;//getTime do obj sincedt retorna a data em UnixTime em milisegundos.
+        //a divisao por mil transforma a data em UnixTime em segundos que e o padrao aceito pela api do facebook
+
+        Connection<Post> postFeed = fbClient.fetchConnection(page.getId() + "/feed", Post.class, Parameter.with("since", sinceunixtime.toString()), Parameter.with("fields", "from,message,created_time"));
+        //instancia uma lista de connections do facebook do tipo Post que receberá os posts retornados pelo metodo
+        //fetchconnection da api
+
+        thepost = new FacePosts();
+
+        //transforma em obj post para ter acesso aos atributos de um post.
+        for (Post aPost : postFeed.getData()) {
+            //populando o objeto thepost e inserindo no banco para cada objeto na lista de connections postFeed
+
+            thepost.setPost_id(aPost.getId());
+            thepost.setMessage(aPost.getMessage());
+            thepost.setCreated_time(aPost.getCreatedTime());
+
+            ConnectionJDBC.insertPost(thepost);//insere na tabela do banco
+        }
+    }
+
     protected static JsonArray getPosts(String since, String until) {
-        
-        
-        /* 3.1 - Dados brutos (getPosts): O usuário passará como parâmetro "since" (uma data) e o "until" (outra data).
- O método deverá retornar todos os posts, com todos os campos que são capturados, contemplados dentro desse período.
- 
-        O retorno do método deve ser um objeto do tipo JSON. 
 
-Exemplo de chamada: getPosts("20170101","20171231");
-Exemplo de retorno: [ {"id": "123123123123", "content": "abcd"}, {"id": "123123123124", "content": "bcad"} ]*/
-        //DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-        JsonArray myjsonarray = new JsonArray();
-        JsonObject myjsonobj;
-        
+        myjsonarray = new JsonArray();//instancia um novo obj myjsonarray
+
         try {
 
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
-            Date sincedb = formatter.parse(since);
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");//cria uma forma como yyyyMMDD
+            Date sincedb = formatter.parse(since);//converte since e until para o tipo Date conforme a forma acima
             Date untildb = formatter.parse(until);
 
-            formatter = new SimpleDateFormat("yyyy-MM-dd");
+            formatter = new SimpleDateFormat("yyyy-MM-dd");//modifica a forma para o novo formato aceito no banco
 
-            since = formatter.format(sincedb);
+            since = formatter.format(sincedb);//atribui a data formatada pela nova forma às strings since e until
             until = formatter.format(untildb);
 
-            System.out.println("FORMATTED SINCE: " + since);
-            System.out.println("FORMATTED UNTIL: " + until);
-
+            //System.out.println("FORMATTED SINCE: " + since);
+            //System.out.println("FORMATTED UNTIL: " + until);
             java.sql.Connection conn = ConnectionJDBC.returnConn();
 
             String sql = "SELECT * FROM posts where created_time between '" + since + "' and '" + until + " 23:59:00';";
-
-            System.out.println("MY SQL: " + sql);
-
+            //seleciona todos os posts dentro do periodo de datas selecionado
+            
+            //System.out.println("MY SQL: " + sql);
             Statement statement = conn.createStatement();
             ResultSet result;
 
             result = statement.executeQuery(sql);
 
-            PostsConsumer.thepost = new FacePosts();
+            thepost = new FacePosts();
 
-          /*  File file = new File("my_json.js");//full file path URL
-            String absolutePath = file.getAbsolutePath();       
-            
-            FileOutputStream fos = new FileOutputStream(absolutePath);
-            
-            // um gerador de JSON que escreve no arquivo
-            JsonGenerator geradorJson = Json.createGenerator(fos);
-
-            // começamos a escrever um Array JSON
-            geradorJson.writeStartArray(); */
-          
-          //String userResponseListValue = gson.toJson(map);
-
-            
             while (result.next()) {
 
                 thepost.setPost_id(result.getString(1));
                 thepost.setMessage(result.getString(2));
-                thepost.setCreated_time(result.getDate(3));
-                   
-                //preenche o objeto com os campos: titulo, ano e genero
+
                 myjsonobj = new JsonObject();
-                
-                myjsonobj.put("id", thepost.getPost_id().substring(thepost.getPost_id().indexOf('_')+1,thepost.getPost_id().length() ));
-		myjsonobj.put("content", thepost.getMessage());
-                
+                //instancia um novo obj json
+                myjsonobj.put("id", thepost.getPost_id().substring(thepost.getPost_id().indexOf('_') + 1, thepost.getPost_id().length()));
+                //quebra o id apartir do _ para pegar somente o id do post e preenche o json 
+                myjsonobj.put("content", thepost.getMessage());
+                //preenche o Json com a mensagem
                 myjsonarray.put(myjsonobj);
-                
-               // String json_string = myjsonobj.toString();
-		//System.out.println("objeto original -> " + json_string);
-		//System.out.println();
-               
-              /*      
-                // começando a escrever o objeto JSON e então as propriedades, por fim fecha o objeto
-               geradorJson.writeStartObject()
-                    .write("id", thepost.getPost_id())
-                    .write("message", thepost.getMessage())
-               .writeEnd();                
-                // terminamos o array e escrevemos no Stream (agora devemos ver a saída no console)
-                
-
-                /*System.out.println("FROM ID: " + thepost.getPost_id());
-                System.out.println("-->" + thepost.getMessage());
-                System.out.println("WHEN: " + thepost.getCreated_time());*/
-
+                //joga cada Json criado para o array
             }
-            //geradorJson.writeEnd().close();      
-        
+
         } catch (ParseException | ClassNotFoundException | InstantiationException | IllegalAccessException | SQLException ex) {
             Logger.getLogger(PostsConsumer.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        return myjsonarray;
-        
+        return myjsonarray;//retorna o array completo
+
     }
 
     protected static JsonArray getVolume(String since, String until) {
 
-        /* 3.2 - Dados consolidados (getVolume): O usuário passará como parâmetro "since" (uma data) e o "until" (outra data).
- O método deverá retornar, para cada dia nesse intervalo, a quantidade de posts que foi coletada.
+        myjsonarray = new JsonArray(); //instancia um novo obj myjsonarray
 
-Exemplo de chamada de 01 de janeiro de 2017 a 05 de janeiro de 2017: getVolume("20170101","20170105");
-Exemplo de retorno: OLHAR EMAIL! */
-        
-        JsonArray myjsonarray = new JsonArray();
-        JsonObject myjsonobj;
-        
         try {
 
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
-            Date sincedb = formatter.parse(since);
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");//cria uma forma como yyyyMMDD
+            Date sincedb = formatter.parse(since);//converte since e until para o tipo Date conforme a forma acima
             Date untildb = formatter.parse(until);
 
-            formatter = new SimpleDateFormat("yyyy-MM-dd");
+            formatter = new SimpleDateFormat("yyyy-MM-dd");//modifica a forma para o novo formato aceito no banco
 
-            since = formatter.format(sincedb);
+            since = formatter.format(sincedb);//atribuo a data formatada pela nova forma às strings since e until
             until = formatter.format(untildb);
 
             java.sql.Connection conn = ConnectionJDBC.returnConn();
 
             String sql = "SELECT created_time, count(*) FROM posts where created_time \n"
                     + "between '" + since + "' and '" + until + " 23:59:00' group by DAY(created_time), MONTH(created_time), YEAR(created_time)";
+            //agrupa por dia a quantidade de posts selecionados no intervalo de datas
 
-            System.out.println("MY SQL: " + sql);
-
+            //System.out.println("MY SQL: " + sql);
             Statement statement = conn.createStatement();
             ResultSet result;
 
             result = statement.executeQuery(sql);
 
-            //int count = 0;
-            PostsConsumer.thepost = new FacePosts();
-
             while (result.next()) {
-                
+
                 myjsonobj = new JsonObject();
-                
+                //instancia um novo obj json
                 formatter = new SimpleDateFormat("yyyyMMdd");
-                              
-                myjsonobj.put("date", formatter.format(formatter.parse(since)));
-		myjsonobj.put("sum_posts", result.getString(2));
-                
+                //cria a forma para a data a ser impressa           
+                myjsonobj.put("date", formatter.format(result.getDate(1)));
+                //preenche o json com a data formatada novamente
+                myjsonobj.put("sum_posts", result.getString(2));
+                //preenche o json com o count dos posts por dia
                 myjsonarray.put(myjsonobj);
-            }      
-            
+                //joga cada Json criado para o array
+            }
 
         } catch (ParseException | ClassNotFoundException | InstantiationException | IllegalAccessException | SQLException ex) {
             Logger.getLogger(PostsConsumer.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
-        return myjsonarray;
 
+        return myjsonarray;//retorna o array completo
     }
-
-    protected static void fetchFacePosts(int lastXdays, String facebookPg, String accessToken) throws ParseException {
-
-        FacebookClient fbClient = new DefaultFacebookClient(accessToken, Version.LATEST);
-
-        Page page = fbClient.fetchObject(facebookPg, Page.class);
-
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(Calendar.getInstance().getTime());
-        Date sincedt = cal.getTime();
-
-        System.out.println("Current Date: " + cal.getTime());
-        System.out.println("Unix Time Date: " + sincedt.getTime() / 1000);
-
-        cal.add(Calendar.DATE, -lastXdays);
-        sincedt = cal.getTime(); //has the old date
-
-        System.out.println("Old Date: " + cal.getTime());
-        System.out.println("Unix Time Old Date: " + sincedt.getTime() / 1000);
-
-        Long sinceunixtime = sincedt.getTime() / 1000;
-
-        Connection<Post> postFeed = fbClient.fetchConnection(page.getId() + "/feed", Post.class, Parameter.with("since", sinceunixtime.toString()), Parameter.with("fields", "from,message,created_time"));
-
-        PostsConsumer.thepost = new FacePosts();
-
-        for (Post aPost : postFeed.getData()) {
-
-            thepost.setPost_id(aPost.getId());
-            thepost.setMessage(aPost.getMessage());
-            thepost.setCreated_time(aPost.getCreatedTime());
-            
-
-            /*System.out.println("FROM: " + aPost.getFrom().getName());
-                System.out.println("-->" + aPost.getMessage());
-                System.out.println("ID: " + aPost.getId());
-                System.out.println("WHEN: " + aPost.getCreatedTime());*/
-            insertPost(thepost);
-
-        }
-
-    }
-
-    protected static boolean insertPost(FacePosts thepost) throws ParseException {
-
-        try {
-
-            java.sql.Connection conn = ConnectionJDBC.returnConn();
-
-            String sql = "insert into posts(post_id,message,created_time) values (?,?,?);";
-
-            PreparedStatement statement = conn.prepareStatement(sql);
-
-            statement.setString(1, thepost.getPost_id());
-            statement.setString(2, thepost.getMessage());
-
-            statement.setString(3, thepost.getCreated_time());
-
-            int rowsInserted = statement.executeUpdate();
-
-            if (rowsInserted > 0) {
-                System.out.println("A new post was inserted successfully!");
-                conn.close();
-            } else {
-                System.out.println("Post was not successfully inserted, please check!");
-                conn.close();
-            }
-            return true;
-
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | SQLException ex) {
-            Logger.getLogger(PostsConsumer.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return false;
-
-    }
-
 }

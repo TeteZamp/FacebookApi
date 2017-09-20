@@ -3,11 +3,6 @@ import com.restfb.json.JsonArray;
 import java.text.ParseException;
 import java.util.Scanner;
 
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 /**
  *
  * @author Stefania
@@ -16,30 +11,28 @@ public class Main {
 
     private static boolean isdbcreated;
 
-    /**
-     * @param args the command line arguments
-     */
     public static void main(String[] args) throws ParseException {
-        // TODO code application logic here
 
-        isdbcreated = ConnectionJDBC.createDB();
+        isdbcreated = ConnectionJDBC.createDB(); //cria o banco
 
         if (isdbcreated == true) {
 
-            Scanner reader = new Scanner(System.in);  // Reading from System.in
+            Scanner reader = new Scanner(System.in);
 
             System.out.println("Enter an access Token: ");
-            String accessToken = reader.next(); // Scans the next token of the input as an int.
+            String accessToken = reader.next(); //le o token
 
             System.out.println("Enter the last X days to fetch posts: ");
-            int lastXdays = reader.nextInt();
+            int lastXdays = reader.nextInt(); //le X dias a ser buscado
 
             System.out.println("Enter the Facebook page or ID to fetch the posts: ");
-            String facebookPg = reader.next();
+            String facebookPg = reader.next(); //le a pagina a ser buscada
 
+            //chamada do método que busca os posts e insere no banco
             PostsConsumer.fetchFacePosts(lastXdays, facebookPg, accessToken);
 
             System.out.println("Enter the date interval to fetch the posts from the table (SINCE then UNTIL): ");
+
             System.out.println("TYPE SINCE: ");
             String since = reader.next();
 
@@ -47,18 +40,18 @@ public class Main {
             String until = reader.next();
 
             JsonArray myjsonarray = PostsConsumer.getPosts(since, until);
+            // myjsonarray recebe o retorno do metodo getPosts
 
-            String jsonResultListValue;
-
-            jsonResultListValue = myjsonarray.toString();
-            System.out.println("Output 1 -> " + jsonResultListValue);
+            System.out.println("Output 1 -> " + myjsonarray.toString());
+            //imprime o conteudo do array
 
             myjsonarray = PostsConsumer.getVolume(since, until);
+            //myjsonarray recebe o retorno do metodo getVolume
 
-            jsonResultListValue = myjsonarray.toString();
-            System.out.println("Output 2 -> " + jsonResultListValue);
+            System.out.println("Output 2 -> " + myjsonarray.toString());
+            //imprime o conteudo do array
 
-        }else{
+        } else {
             System.out.println("DB has not been created successfully!!");
         }
     }
