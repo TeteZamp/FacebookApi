@@ -15,6 +15,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -92,7 +93,7 @@ public class PostsConsumer {
 
             String sql = "SELECT * FROM posts where created_time between '" + since + "' and '" + until + " 23:59:00';";
             //seleciona todos os posts dentro do periodo de datas selecionado
-            
+
             //System.out.println("MY SQL: " + sql);
             Statement statement = conn.createStatement();
             ResultSet result;
@@ -130,14 +131,14 @@ public class PostsConsumer {
 
         try {
 
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");//cria uma forma como yyyyMMDD
-            Date sincedb = formatter.parse(since);//converte since e until para o tipo Date conforme a forma acima
-            Date untildb = formatter.parse(until);
+            SimpleDateFormat formatter1 = new SimpleDateFormat("yyyyMMdd");//cria uma forma como yyyyMMDD
+            SimpleDateFormat formatter2 = new SimpleDateFormat("yyyy-MM-dd");//cria uma forma como yyyyMMDD
 
-            formatter = new SimpleDateFormat("yyyy-MM-dd");//modifica a forma para o novo formato aceito no banco
+            Date sincedb = formatter1.parse(since);//converte since e until para o tipo Date conforme a forma acima
+            Date untildb = formatter1.parse(until);
 
-            since = formatter.format(sincedb);//atribuo a data formatada pela nova forma às strings since e until
-            until = formatter.format(untildb);
+            since = formatter2.format(sincedb);//atribuo a data formatada pela nova forma às strings since e until
+            until = formatter2.format(untildb);
 
             java.sql.Connection conn = ConnectionJDBC.returnConn();
 
@@ -145,24 +146,57 @@ public class PostsConsumer {
                     + "between '" + since + "' and '" + until + " 23:59:00' group by DAY(created_time), MONTH(created_time), YEAR(created_time)";
             //agrupa por dia a quantidade de posts selecionados no intervalo de datas
 
-            //System.out.println("MY SQL: " + sql);
+            System.out.println("MY SQL: " + sql);
             Statement statement = conn.createStatement();
             ResultSet result;
 
             result = statement.executeQuery(sql);
 
-            while (result.next()) {
+            long numDays = TimeUnit.MILLISECONDS.toDays(untildb.getTime() - sincedb.getTime());
 
-                myjsonobj = new JsonObject();
-                //instancia um novo obj json
-                formatter = new SimpleDateFormat("yyyyMMdd");
-                //cria a forma para a data a ser impressa           
-                myjsonobj.put("date", formatter.format(result.getDate(1)));
-                //preenche o json com a data formatada novamente
-                myjsonobj.put("sum_posts", result.getString(2));
-                //preenche o json com o count dos posts por dia
-                myjsonarray.put(myjsonobj);
-                //joga cada Json criado para o array
+            Calendar cal = Calendar.getInstance(); //instancia um obj do tipo calendario
+            cal.setTime(sincedb);
+            Date dt;
+            String newdt1,newdt2;
+
+
+            System.out.println(numDays);
+            result.first();
+
+            for (int i = 0; i <= numDays; i++) {
+
+                System.out.println(result.getDate(1));
+                cal.add(Calendar.DATE, +1);
+                dt = cal.getTime();
+
+                newdt1 = formatter1.format(dt); //yyyyMMdd
+                newdt2 = formatter2.format(dt);  //yyyy-MM-dd
+
+                if (!result.getDate(1).toString().equals(newdt2)) {
+                    myjsonobj = new JsonObject();
+                    //instancia um novo obj json
+                    myjsonobj.put("date", newdt1);
+                    //preenche o json com a data formatada novamente
+                    
+                   // String quotes = "0";
+
+                    myjsonobj.put("sum_posts",  "0");
+                    //preenche o json com o count dos posts por dia
+                    myjsonarray.put(myjsonobj);
+                    //joga cada Json criado para o array
+                } else {
+                    myjsonobj = new JsonObject();
+                    //instancia um novo obj json
+                    myjsonobj.put("date", formatter1.format(result.getDate(1)));
+                    //preenche o json com a data formatada novamente
+                    myjsonobj.put("sum_posts", result.getString(2));
+                    //preenche o json com o count dos posts por dia
+                    myjsonarray.put(myjsonobj);
+                    result.next();
+
+                    //joga cada Json criado para o array
+                }
+
             }
 
         } catch (ParseException | ClassNotFoundException | InstantiationException | IllegalAccessException | SQLException ex) {
