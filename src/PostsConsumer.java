@@ -157,15 +157,15 @@ public class PostsConsumer {
             Calendar cal = Calendar.getInstance(); //instancia um obj do tipo calendario
             cal.setTime(sincedb);
             Date dt;
-            String newdt1,newdt2;
+            String newdt1, newdt2;
 
-
-            System.out.println(numDays);
             result.first();
 
             for (int i = 0; i <= numDays; i++) {
 
-                System.out.println(result.getDate(1));
+                myjsonobj = new JsonObject();
+                //instancia um novo obj json
+
                 cal.add(Calendar.DATE, +1);
                 dt = cal.getTime();
 
@@ -173,29 +173,20 @@ public class PostsConsumer {
                 newdt2 = formatter2.format(dt);  //yyyy-MM-dd
 
                 if (!result.getDate(1).toString().equals(newdt2)) {
-                    myjsonobj = new JsonObject();
-                    //instancia um novo obj json
                     myjsonobj.put("date", newdt1);
                     //preenche o json com a data formatada novamente
-                    
-                   // String quotes = "0";
-
-                    myjsonobj.put("sum_posts",  "0");
+                    // String quotes = "0";
+                    myjsonobj.put("sum_posts", "0");
                     //preenche o json com o count dos posts por dia
-                    myjsonarray.put(myjsonobj);
-                    //joga cada Json criado para o array
                 } else {
-                    myjsonobj = new JsonObject();
-                    //instancia um novo obj json
                     myjsonobj.put("date", formatter1.format(result.getDate(1)));
                     //preenche o json com a data formatada novamente
                     myjsonobj.put("sum_posts", result.getString(2));
                     //preenche o json com o count dos posts por dia
-                    myjsonarray.put(myjsonobj);
                     result.next();
-
-                    //joga cada Json criado para o array
                 }
+                myjsonarray.put(myjsonobj);
+                //joga cada Json criado para o array
 
             }
 
